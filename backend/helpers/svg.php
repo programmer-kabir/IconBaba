@@ -92,32 +92,45 @@ function validateAndSanitizeSvg($rawSvg, &$errorMessage = '') {
 
     $cleanSvg = $dom->saveXML($root);
 
-    // Normalize colors:
-    // Replace hardcoded dark colors with currentColor for flexible theme & customization
-    $colorReplacements = [
-        '#1E1E1E' => 'currentColor',
-        '#1e1e1e' => 'currentColor',
-        '#000000' => 'currentColor',
-        '#000'    => 'currentColor',
-        '#111827' => 'currentColor',
-        '#1F2937' => 'currentColor',
-        '#222222' => 'currentColor',
-        '#222'    => 'currentColor',
-        'black'   => 'currentColor',
-    ];
-
-    foreach ($colorReplacements as $oldColor => $newColor) {
-        // match fill="oldColor" or stroke="oldColor"
-        $cleanSvg = str_ireplace('fill="' . $oldColor . '"', 'fill="' . $newColor . '"', $cleanSvg);
-        $cleanSvg = str_ireplace('stroke="' . $oldColor . '"', 'stroke="' . $newColor . '"', $cleanSvg);
-        $cleanSvg = str_ireplace("fill='{$oldColor}'", "fill='{$newColor}'", $cleanSvg);
-        $cleanSvg = str_ireplace("stroke='{$oldColor}'", "stroke='{$newColor}'", $cleanSvg);
-        // match style="...fill: oldColor..."
-        $cleanSvg = str_ireplace('fill: ' . $oldColor, 'fill: ' . $newColor, $cleanSvg);
-        $cleanSvg = str_ireplace('fill:' . $oldColor, 'fill:' . $newColor, $cleanSvg);
-        $cleanSvg = str_ireplace('stroke: ' . $oldColor, 'stroke: ' . $newColor, $cleanSvg);
-        $cleanSvg = str_ireplace('stroke:' . $oldColor, 'stroke:' . $newColor, $cleanSvg);
+    // Normalize colors and convert all hardcoded styles to currentColor
+    // 1. Process and remove <style> tags (e.g. Illustrator .st0 { fill: #...; })
+    if (preg_match_all('/<style\b[^>]*>(.*?)<\/style>/is', $cleanSvg, $styleMatches)) {
+        foreach ($styleMatches[1] as $css) {
+            if (preg_match_all('/\.([a-zA-Z0-9_-]+)\s*\{([^}]+)\}/is', $css, $ruleMatches, PREG_SET_ORDER)) {
+                foreach ($ruleMatches as $rule) {
+                    $className = $rule[1];
+                    $declarations = $rule[2];
+                    
+                    $hasFill = preg_match('/fill\s*:\s*(?!none\b)[^;}\s]+/i', $declarations);
+                    $hasStroke = preg_match('/stroke\s*:\s*(?!none\b)[^;}\s]+/i', $declarations);
+                    
+                    if ($hasFill) {
+                        $cleanSvg = preg_replace('/\bclass=(["\'])' . preg_quote($className, '/') . '\1/i', 'fill="currentColor"', $cleanSvg);
+                    }
+                    if ($hasStroke) {
+                        $cleanSvg = preg_replace('/\bclass=(["\'])' . preg_quote($className, '/') . '\1/i', 'stroke="currentColor"', $cleanSvg);
+                    }
+                }
+            }
+        }
+        $cleanSvg = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $cleanSvg);
     }
+
+    // 2. Remove XML comments & Illustrator/Inkscape metadata attributes
+    $cleanSvg = preg_replace('/<!--(.*?)-->/s', '', $cleanSvg);
+    $cleanSvg = preg_replace('/\s+id="Layer_[^"]*"/i', '', $cleanSvg);
+    $cleanSvg = preg_replace('/\s+xml:space="preserve"/i', '', $cleanSvg);
+    $cleanSvg = preg_replace('/\s+enable-background="[^"]*"/i', '', $cleanSvg);
+
+    // 3. Normalize hardcoded fill colors (except 'none' and 'transparent') to 'currentColor'
+    $cleanSvg = preg_replace('/(?<![a-zA-Z-])fill=(["\'])(?!none\b|transparent\b|currentColor\b)[^"\']*\1/i', 'fill="currentColor"', $cleanSvg);
+
+    // 4. Normalize hardcoded stroke colors (except 'none' and 'transparent') to 'currentColor'
+    $cleanSvg = preg_replace('/(?<![a-zA-Z-])stroke=(["\'])(?!none\b|transparent\b|currentColor\b)[^"\']*\1/i', 'stroke="currentColor"', $cleanSvg);
+
+    // 5. Normalize inline styles: style="fill: #...; stroke: #..."
+    $cleanSvg = preg_replace('/fill\s*:\s*(?!none\b|transparent\b|currentColor\b)[^;}"\']+/i', 'fill: currentColor', $cleanSvg);
+    $cleanSvg = preg_replace('/stroke\s*:\s*(?!none\b|transparent\b|currentColor\b)[^;}"\']+/i', 'stroke: currentColor', $cleanSvg);
 
     return trim($cleanSvg);
 }

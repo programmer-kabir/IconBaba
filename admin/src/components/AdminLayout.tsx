@@ -322,7 +322,7 @@ export default function AdminLayout() {
 
         {/* Main Viewport */}
         <main className="flex-1 overflow-y-auto bg-slate-950 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
+          <div className="mx-auto">
             <Outlet />
           </div>
         </main>

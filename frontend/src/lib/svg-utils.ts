@@ -13,7 +13,7 @@ export function applyCustomizationToSvg(
 
   let customized = svgStr;
 
-  // Replace or inject width & height (using negative lookbehind so stroke-width is not matched)
+  // 1. Inject or replace width & height
   if (/(?<![a-zA-Z-])width=/.test(customized)) {
     customized = customized.replace(/(?<![a-zA-Z-])width="[^"]*"/g, `width="${custom.size}"`);
   } else {
@@ -26,30 +26,56 @@ export function applyCustomizationToSvg(
     customized = customized.replace('<svg', `<svg height="${custom.size}"`);
   }
 
-  // Detect if this SVG is a stroke-based icon (has fill="none" or stroke="currentColor" without fill="currentColor")
-  // vs a true solid-filled icon (has fill="currentColor" or solid fill without fill="none")
-  const isStrokeBased = customized.includes('fill="none"') || (customized.includes('stroke="currentColor"') && !customized.includes('fill="currentColor"'));
+  // 2. Inject CSS style="color: ${custom.color};" on root <svg>
+  // This guarantees that any currentColor inside the SVG instantly takes custom.color!
+  if (/style="[^"]*"/.test(customized)) {
+    customized = customized.replace(/style="([^"]*)"/, (_, styles) => {
+      const cleaned = styles.replace(/color\s*:[^;]+;?/gi, '').trim();
+      return `style="color: ${custom.color}; ${cleaned}"`;
+    });
+  } else {
+    customized = customized.replace('<svg', `<svg style="color: ${custom.color};"`);
+  }
 
-  if (style === 'filled' && !isStrokeBased) {
-    // For TRUE solid filled icons, set fill color
-    if (customized.includes('fill="currentColor"')) {
-      customized = customized.replace(/fill="currentColor"/g, `fill="${custom.color}"`);
-    } else if (/(?<![a-zA-Z-])fill=/.test(customized)) {
-      customized = customized.replace(/(?<![a-zA-Z-])fill="[^"]*"/g, `fill="${custom.color}"`);
-    } else {
+  // 3. Handle <style> tags (e.g. Illustrator CSS classes like .st0 { fill: #231F20; })
+  if (customized.includes('<style')) {
+    customized = customized.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (_, css) => {
+      const updatedCss = css
+        .replace(/fill\s*:\s*(?!none)[^;}"']+/gi, `fill: ${custom.color}`)
+        .replace(/stroke\s*:\s*(?!none)[^;}"']+/gi, `stroke: ${custom.color}`);
+      return `<style>${updatedCss}</style>`;
+    });
+  }
+
+  // 4. Handle style: 'filled' vs 'outlined'
+  if (style === 'filled') {
+    // Replace all fills (currentColor, hex, rgb, or named) with custom.color (EXCEPT fill="none" and fill="transparent")
+    customized = customized.replace(/(?<![a-zA-Z-])fill=(["'])(?!none\b|transparent\b)[^"']*\1/gi, `fill="${custom.color}"`);
+    
+    // Also replace inline style="...fill: ..."
+    customized = customized.replace(/fill\s*:\s*(?!none\b|transparent\b)[^;}"']+/gi, `fill: ${custom.color}`);
+
+    // If root <svg fill="none"> is present, convert it to fill="custom.color" so solid shapes inherit it
+    customized = customized.replace(/(<svg\b[^>]*?)\s+fill=(["'])none\2/gi, `$1 fill="${custom.color}"`);
+
+    // If root <svg> has NO fill attribute, set default fill to custom.color
+    if (!/(?<![a-zA-Z-])fill=/.test(customized)) {
       customized = customized.replace('<svg', `<svg fill="${custom.color}"`);
     }
+
+    // If strokes exist with currentColor or hardcoded color, match them to custom.color
+    customized = customized.replace(/(?<![a-zA-Z-])stroke=(["'])(?!none\b|transparent\b)[^"']*\1/gi, `stroke="${custom.color}"`);
   } else {
-    // For outlined icons OR stroke-based icons (which have no solid filled variant):
-    // Set stroke color, stroke-width, stroke-linecap, stroke-linejoin, and keep fill="none"
-    if (customized.includes('stroke="currentColor"')) {
-      customized = customized.replace(/stroke="currentColor"/g, `stroke="${custom.color}"`);
-    } else if (/(?<![a-zA-Z-])stroke=/.test(customized)) {
-      customized = customized.replace(/(?<![a-zA-Z-])stroke="[^"]*"/g, `stroke="${custom.color}"`);
-    } else {
+    // style === 'outlined'
+    // Replace all strokes with custom.color (EXCEPT stroke="none" and stroke="transparent")
+    customized = customized.replace(/(?<![a-zA-Z-])stroke=(["'])(?!none\b|transparent\b)[^"']*\1/gi, `stroke="${custom.color}"`);
+    
+    // If root <svg> has NO stroke attribute, add stroke="${custom.color}"
+    if (!/(?<![a-zA-Z-])stroke=/.test(customized)) {
       customized = customized.replace('<svg', `<svg stroke="${custom.color}"`);
     }
 
+    // Stroke width, linecap, linejoin
     if (customized.includes('stroke-width=')) {
       customized = customized.replace(/stroke-width="[^"]*"/g, `stroke-width="${custom.strokeWidth}"`);
     } else {
@@ -66,6 +92,13 @@ export function applyCustomizationToSvg(
       customized = customized.replace(/stroke-linejoin="[^"]*"/g, `stroke-linejoin="${custom.strokeLinejoin}"`);
     } else {
       customized = customized.replace('<svg', `<svg stroke-linejoin="${custom.strokeLinejoin}"`);
+    }
+
+    // In outlined mode, ensure root <svg> has fill="none"
+    if (/(?<![a-zA-Z-])fill=/.test(customized)) {
+      customized = customized.replace(/(<svg\b[^>]*?)\s+fill=(["'])[^"']*\2/gi, '$1 fill="none"');
+    } else {
+      customized = customized.replace('<svg', '<svg fill="none"');
     }
   }
 
