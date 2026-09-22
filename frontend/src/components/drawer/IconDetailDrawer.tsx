@@ -241,7 +241,7 @@ export default function IconDetailDrawer({
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-lg bg-[#12131d] border-l border-white/10 shadow-2xl flex flex-col overflow-y-auto animate-in slide-in-from-right duration-250">
+      <div className="fixed right-0 top-0 bottom-0 z-50 w-full sm:max-w-xl md:max-w-2xl bg-[#12131d] border-l border-white/10 shadow-2xl flex flex-col overflow-y-auto animate-in slide-in-from-right duration-250">
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 sticky top-0 bg-[#12131d]/95 backdrop-blur-md z-10">
           <div>
@@ -308,20 +308,24 @@ export default function IconDetailDrawer({
           {/* Big Preview Canvas */}
           <div className="relative rounded-2xl overflow-hidden border border-white/10">
             <div
-              className={`w-full h-56 flex items-center justify-center transition-colors ${
+              className={`w-full flex items-center justify-center p-6 overflow-auto transition-all ${
                 bgMode === 'checkerboard'
                   ? 'bg-checkerboard'
                   : bgMode === 'dark'
                   ? 'bg-[#090a0f]'
                   : 'bg-white'
               }`}
+              style={{
+                minHeight: `${Math.min(560, Math.max(260, localCustom.size + 48))}px`,
+              }}
             >
               <div
                 style={{
-                  width: `${Math.max(64, localCustom.size * 1.5)}px`,
-                  height: `${Math.max(64, localCustom.size * 1.5)}px`,
+                  width: `${localCustom.size}px`,
+                  height: `${localCustom.size}px`,
+                  maxWidth: '100%',
                 }}
-                className="flex items-center justify-center transition-all drop-shadow-md"
+                className="flex items-center justify-center transition-all drop-shadow-md shrink-0 [&>svg]:w-full [&>svg]:h-full"
                 dangerouslySetInnerHTML={{ __html: customizedSvg }}
               />
             </div>
@@ -331,27 +335,24 @@ export default function IconDetailDrawer({
               <button
                 onClick={() => setBgMode('checkerboard')}
                 title="Checkerboard"
-                className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors ${
-                  bgMode === 'checkerboard' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors ${bgMode === 'checkerboard' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 Pattern
               </button>
               <button
                 onClick={() => setBgMode('dark')}
                 title="Dark Background"
-                className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors ${
-                  bgMode === 'dark' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors ${bgMode === 'dark' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 Dark
               </button>
               <button
                 onClick={() => setBgMode('light')}
                 title="Light Background"
-                className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors ${
-                  bgMode === 'light' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors ${bgMode === 'light' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 Light
               </button>
@@ -373,11 +374,10 @@ export default function IconDetailDrawer({
               <button
                 type="button"
                 onClick={() => setLocalStyle('outlined')}
-                className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${
-                  localStyle === 'outlined'
+                className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${localStyle === 'outlined'
                     ? 'bg-purple-600/20 border-purple-500/50 text-white shadow-md shadow-purple-600/10'
                     : 'bg-black/30 border-white/5 text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <div
                   className="size-7 flex items-center justify-center shrink-0"
@@ -399,11 +399,10 @@ export default function IconDetailDrawer({
               <button
                 type="button"
                 onClick={() => setLocalStyle('filled')}
-                className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${
-                  localStyle === 'filled'
+                className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${localStyle === 'filled'
                     ? 'bg-purple-600/20 border-purple-500/50 text-white shadow-md shadow-purple-600/10'
                     : 'bg-black/30 border-white/5 text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <div
                   className="size-7 flex items-center justify-center shrink-0"
@@ -477,17 +476,33 @@ export default function IconDetailDrawer({
             <div>
               <div className="flex justify-between text-xs font-medium text-slate-300 mb-1.5">
                 <span>Icon Size</span>
-                <span className="font-mono text-purple-400">{localCustom.size}px</span>
+                <span className="font-mono text-purple-400 font-bold">{localCustom.size}px</span>
               </div>
               <input
                 type="range"
                 min="16"
-                max="96"
-                step="4"
+                max="512"
+                step="8"
                 value={localCustom.size}
                 onChange={(e) => setLocalCustom((prev) => ({ ...prev, size: Number(e.target.value) }))}
                 className="w-full accent-purple-500 cursor-pointer"
               />
+              <div className="flex items-center justify-between gap-1 mt-2">
+                {[24, 32, 48, 64, 128, 256, 512].map((sz) => (
+                  <button
+                    key={sz}
+                    type="button"
+                    onClick={() => setLocalCustom((prev) => ({ ...prev, size: sz }))}
+                    className={`px-2 py-1 text-[10px] font-mono font-medium rounded-lg border transition-all ${
+                      localCustom.size === sz
+                        ? 'bg-purple-600 border-purple-500 text-white shadow-sm'
+                        : 'bg-black/30 border-white/10 text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {sz}px
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Color Selector (Local to this icon) */}
@@ -502,9 +517,8 @@ export default function IconDetailDrawer({
                     key={c}
                     type="button"
                     onClick={() => setLocalCustom((prev) => ({ ...prev, color: c }))}
-                    className={`size-6 rounded-lg border transition-transform ${
-                      localCustom.color === c ? 'border-white scale-110 shadow-md' : 'border-white/20 hover:scale-105'
-                    }`}
+                    className={`size-6 rounded-lg border transition-transform ${localCustom.color === c ? 'border-white scale-110 shadow-md' : 'border-white/20 hover:scale-105'
+                      }`}
                     style={{ backgroundColor: c }}
                     aria-label={`Select color ${c}`}
                   />
@@ -549,11 +563,10 @@ export default function IconDetailDrawer({
                       <button
                         key={cap}
                         onClick={() => setLocalCustom((prev) => ({ ...prev, strokeLinecap: cap }))}
-                        className={`py-1 text-[11px] font-medium capitalize rounded-lg transition-colors ${
-                          localCustom.strokeLinecap === cap
+                        className={`py-1 text-[11px] font-medium capitalize rounded-lg transition-colors ${localCustom.strokeLinecap === cap
                             ? 'bg-purple-600 text-white font-semibold'
                             : 'text-slate-400 hover:text-white'
-                        }`}
+                          }`}
                       >
                         {cap}
                       </button>
@@ -568,11 +581,10 @@ export default function IconDetailDrawer({
                       <button
                         key={join}
                         onClick={() => setLocalCustom((prev) => ({ ...prev, strokeLinejoin: join }))}
-                        className={`py-1 text-[11px] font-medium capitalize rounded-lg transition-colors ${
-                          localCustom.strokeLinejoin === join
+                        className={`py-1 text-[11px] font-medium capitalize rounded-lg transition-colors ${localCustom.strokeLinejoin === join
                             ? 'bg-purple-600 text-white font-semibold'
                             : 'text-slate-400 hover:text-white'
-                        }`}
+                          }`}
                       >
                         {join}
                       </button>
