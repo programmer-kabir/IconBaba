@@ -1,4 +1,5 @@
 // frontend/lib/api.ts
+import { deobfuscateVector } from '@/lib/svg-utils';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost/iconbaba/backend/api';
 
@@ -23,6 +24,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-Iconbaba-Client': 'web-app-v1',
+    'X-Requested-With': 'XMLHttpRequest',
     ...(options.headers as Record<string, string> || {}),
   };
 
@@ -48,14 +51,16 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 // Categories
-export async function getCategories() {
-  return request<{ total_icons: number; categories: import('@/types/icon').CategoryItem[] }>('/categories/list.php');
+export async function getCategories(style?: 'outlined' | 'filled') {
+  const query = style ? `?style=${style}` : '';
+  return request<{ total_icons: number; categories: import('@/types/icon').CategoryItem[] }>(`/categories/list.php${query}`);
 }
 
 // Icons
 export async function getIcons(params: {
   category?: string;
   style?: 'outlined' | 'filled';
+  tier?: 'all' | 'free' | 'pro';
   search?: string;
   page?: number;
   limit?: number;
@@ -63,12 +68,13 @@ export async function getIcons(params: {
   const searchParams = new URLSearchParams();
   if (params.category) searchParams.set('category', params.category);
   if (params.style) searchParams.set('style', params.style);
+  if (params.tier && params.tier !== 'all') searchParams.set('tier', params.tier);
   if (params.search) searchParams.set('search', params.search);
   if (params.page) searchParams.set('page', params.page.toString());
   if (params.limit) searchParams.set('limit', params.limit.toString());
 
-  return request<{
-    icons: import('@/types/icon').IconItem[];
+  const res = await request<{
+    icons: Array<import('@/types/icon').IconItem & { v_data?: string }>;
     pagination: {
       total: number;
       page: number;
@@ -76,11 +82,51 @@ export async function getIcons(params: {
       total_pages: number;
     };
   }>(`/icons/list.php?${searchParams.toString()}`);
+
+  if (res.success && res.data?.icons) {
+    res.data.icons = res.data.icons.map((item) => ({
+      ...item,
+      // Layer 2 Security: Seamless client-side deobfuscation into memory
+      svg: deobfuscateVector(item.v_data || item.svg),
+    }));
+  }
+
+  return res as {
+    success: boolean;
+    data?: {
+      icons: import('@/types/icon').IconItem[];
+      pagination: {
+        total: number;
+        page: number;
+        limit: number;
+        total_pages: number;
+      };
+    };
+    message?: string;
+  };
 }
 
 export async function getIcon(idOrName: string | number) {
   const param = typeof idOrName === 'number' ? `id=${idOrName}` : `name=${encodeURIComponent(idOrName)}`;
-  return request<import('@/types/icon').IconItem & { variants: Record<string, string> }>(`/icons/single.php?${param}`);
+  const res = await request<import('@/types/icon').IconItem & { variants?: Record<string, string>; v_variants?: Record<string, string> }>(`/icons/single.php?${param}`);
+  
+  if (res.success && res.data) {
+    const rawVariants = res.data.v_variants || res.data.variants || {};
+    const decodedVariants: Record<string, string> = {};
+    for (const [sKey, sVal] of Object.entries(rawVariants)) {
+      decodedVariants[sKey] = deobfuscateVector(sVal as string);
+    }
+    res.data.variants = decodedVariants;
+    if (!res.data.svg && decodedVariants['outlined']) {
+      res.data.svg = decodedVariants['outlined'];
+    }
+  }
+
+  return res as {
+    success: boolean;
+    data?: import('@/types/icon').IconItem & { variants: Record<string, string> };
+    message?: string;
+  };
 }
 
 // Auth
@@ -175,12 +221,35 @@ export async function deleteCollection(collectionId: number) {
   });
 }
 
-// Downloads
-export async function logDownload(iconId: number, format: 'svg' | 'png', size: number) {
-  return request<null>('/downloads/log.php', {
+// Downloads & Export Quota
+export async function getQuotaStatus() {
+  return request<import('@/types/icon').QuotaStatus>('/icons/quota.php');
+}
+
+export async function trackExport(params: {
+  iconId: number;
+  action: 'download' | 'copy';
+  format?: 'svg' | 'png' | 'jsx';
+  size?: number;
+}) {
+  return request<{
+    allowed: boolean;
+    quota: import('@/types/icon').QuotaStatus;
+    require_login?: boolean;
+    require_pro?: boolean;
+  }>('/icons/track_export.php', {
     method: 'POST',
-    body: JSON.stringify({ icon_id: iconId, format, size }),
+    body: JSON.stringify({
+      icon_id: params.iconId,
+      action: params.action,
+      format: params.format || 'svg',
+      size: params.size || 24,
+    }),
   });
+}
+
+export async function logDownload(iconId: number, format: 'svg' | 'png', size: number) {
+  return trackExport({ iconId, action: 'download', format, size });
 }
 
 export async function getDownloadHistory(style: 'outlined' | 'filled' = 'outlined') {

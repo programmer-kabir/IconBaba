@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, History, Download, Sparkles } from 'lucide-react';
 import SiteHeader from '@/components/header/SiteHeader';
 import IconDetailDrawer from '@/components/drawer/IconDetailDrawer';
-import AuthModal from '@/components/auth/AuthModal';
 import { DownloadHistoryItem, IconItem } from '@/types/icon';
 import { getDownloadHistory } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useIconCustomization } from '@/context/IconCustomizationContext';
 import { applyCustomizationToSvg } from '@/lib/svg-utils';
+import ProtectedCanvasPreview from '@/components/common/ProtectedCanvasPreview';
 
 export default function HistoryPage() {
   const { user, setShowAuthModal, setAuthMode } = useAuth();
@@ -88,15 +88,18 @@ export default function HistoryPage() {
               <div
                 key={item.download_id}
                 onClick={() => setSelectedIcon(item.icon)}
-                className="group aspect-square rounded-2xl p-3 flex flex-col items-center justify-center relative overflow-hidden cursor-pointer bg-[#141522] border border-white/5 hover:border-purple-500/40 transition-all hover:shadow-xl"
+                onContextMenu={(e) => e.preventDefault()}
+                className="group aspect-square rounded-2xl p-3 flex flex-col items-center justify-center relative overflow-hidden cursor-pointer select-none bg-[#141522] border border-white/5 hover:border-purple-500/40 transition-all hover:shadow-xl"
               >
                 <div
-                  className="relative z-10 flex items-center justify-center mb-2"
+                  className="relative z-10 flex items-center justify-center mb-2 pointer-events-none"
                   style={{ width: '40px', height: '40px' }}
-                  dangerouslySetInnerHTML={{
-                    __html: applyCustomizationToSvg(item.icon.svg, customization, style),
-                  }}
-                />
+                >
+                  <ProtectedCanvasPreview
+                    svgContent={applyCustomizationToSvg(item.icon.svg, customization, style)}
+                    size={40}
+                  />
+                </div>
                 <span className="relative z-10 text-[11px] font-medium text-slate-300 truncate w-full text-center">
                   {item.icon.name}
                 </span>
@@ -116,8 +119,6 @@ export default function HistoryPage() {
         onOpenAddToCollection={() => {}}
         onSelectIcon={(icon) => setSelectedIcon(icon)}
       />
-
-      <AuthModal />
     </div>
   );
 }

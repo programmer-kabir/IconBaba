@@ -1,4 +1,4 @@
-// frontend/context/IconCustomizationContext.tsx
+// frontend/src/context/IconCustomizationContext.tsx
 'use client';
 
 import React, { createContext, useContext, useState } from 'react';
@@ -13,12 +13,14 @@ interface IconCustomizationContextType {
   setStrokeWidth: (width: number) => void;
   setStrokeLinecap: (linecap: StrokeLinecap) => void;
   setStrokeLinejoin: (linejoin: StrokeLinejoin) => void;
+  quickCopyMode: boolean;
+  setQuickCopyMode: (enabled: boolean) => void;
   resetCustomization: () => void;
 }
 
 const DEFAULT_CUSTOMIZATION: IconCustomization = {
-  size: 48,
-  color: '#8b5cf6', // Primary Purple
+  size: 32,
+  color: '#a855f7', // Electric Purple
   strokeWidth: 2,
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
@@ -29,6 +31,7 @@ const IconCustomizationContext = createContext<IconCustomizationContextType | un
 export function IconCustomizationProvider({ children }: { children: React.ReactNode }) {
   const [style, setStyle] = useState<IconStyle>('outlined');
   const [customization, setCustomization] = useState<IconCustomization>(DEFAULT_CUSTOMIZATION);
+  const [quickCopyMode, setQuickCopyMode] = useState<boolean>(false);
 
   const setSize = (size: number) => setCustomization((prev) => ({ ...prev, size }));
   const setColor = (color: string) => setCustomization((prev) => ({ ...prev, color }));
@@ -42,7 +45,10 @@ export function IconCustomizationProvider({ children }: { children: React.ReactN
   const setStrokeLinejoin = (strokeLinejoin: StrokeLinejoin) =>
     setCustomization((prev) => ({ ...prev, strokeLinejoin }));
 
-  const resetCustomization = () => setCustomization(DEFAULT_CUSTOMIZATION);
+  const resetCustomization = () => {
+    setCustomization(DEFAULT_CUSTOMIZATION);
+    setQuickCopyMode(false);
+  };
 
   return (
     <IconCustomizationContext.Provider
@@ -55,6 +61,8 @@ export function IconCustomizationProvider({ children }: { children: React.ReactN
         setStrokeWidth,
         setStrokeLinecap,
         setStrokeLinejoin,
+        quickCopyMode,
+        setQuickCopyMode,
         resetCustomization,
       }}
     >

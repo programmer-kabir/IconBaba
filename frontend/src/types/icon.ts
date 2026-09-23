@@ -5,6 +5,8 @@ export type IconStyle = 'outlined' | 'filled';
 export type StrokeLinecap = 'round' | 'butt' | 'square';
 export type StrokeLinejoin = 'round' | 'bevel' | 'miter';
 
+export type IconTier = 'all' | 'free' | 'pro';
+
 export interface IconItem {
   id: number;
   name: string;
@@ -15,7 +17,9 @@ export interface IconItem {
   downloads_count: number;
   favorites_count: number;
   style: IconStyle;
+  is_premium?: boolean;
   svg: string;
+  v_data?: string;
 }
 
 export interface CategoryItem {
@@ -40,6 +44,7 @@ export interface User {
   full_name: string;
   avatar_url?: string | null;
   role: string;
+  roles?: string[];
   stats?: {
     favorites_count: number;
     collections_count: number;
@@ -66,3 +71,15 @@ export interface DownloadHistoryItem {
   downloaded_at: string;
   icon: IconItem;
 }
+
+export interface QuotaStatus {
+  plan: 'guest' | 'free' | 'pro';
+  is_unlimited: boolean;
+  used: number;
+  limit: number | null;
+  remaining: number;
+  can_export: boolean;
+  require_login: boolean;
+  require_pro: boolean;
+}
+

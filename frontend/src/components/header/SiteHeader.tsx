@@ -1,7 +1,7 @@
 // frontend/src/components/header/SiteHeader.tsx
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, Heart, Folder, History, LogOut, Sparkles } from 'lucide-react';
+import { Menu, X, Heart, Folder, History, LogOut, Sparkles, Shield, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 interface SiteHeaderProps {
@@ -13,6 +13,9 @@ export default function SiteHeader({ onToggleSidebar, sidebarOpen = false }: Sit
   const { user, logout, setShowAuthModal, setAuthMode } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [navMenuOpen, setNavMenuOpen] = useState(false);
+
+  const isAdmin = Boolean(user && (user.roles?.includes('admin') || user.role === 'admin'));
+  const currentToken = typeof window !== 'undefined' ? localStorage.getItem('iconbaba_token') : null;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#0d0e15]/90 backdrop-blur-md">
@@ -29,19 +32,15 @@ export default function SiteHeader({ onToggleSidebar, sidebarOpen = false }: Sit
             </button>
           )}
 
-          <Link to="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-            {/* Animated Logo Mark */}
-            <div className="relative size-9 flex items-center justify-center rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 shadow-lg shadow-purple-500/20">
-              <Sparkles className="size-5 text-white animate-pulse" />
-            </div>
-            <div>
-              <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-purple-400 via-pink-400 to-purple-300 bg-clip-text text-transparent">
-                IconBaba
-              </span>
-              <span className="hidden sm:inline-block ml-2 text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                5,000+ Icons
-              </span>
-            </div>
+          <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+            <img
+              src="/nav-logo.png"
+              alt="IconBaba"
+              className="h-10 sm:h-8 w-auto object-contain filter drop-shadow-[0_2px_12px_rgba(168,85,247,0.35)]"
+            />
+            <span className="hidden sm:inline-block text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              5,000+ Icons
+            </span>
           </Link>
         </div>
 
@@ -61,6 +60,21 @@ export default function SiteHeader({ onToggleSidebar, sidebarOpen = false }: Sit
             </svg>
           </a>
 
+          {/* Admin panel direct quick-switcher for admins */}
+          {isAdmin && (
+            <a
+              href={`http://localhost:3001${currentToken ? `?token=${currentToken}` : ''}`}
+              target="_blank"
+              rel="noreferrer"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-purple-200 border border-purple-500/30 text-xs font-semibold transition-all shadow-sm shadow-purple-950"
+              title="Open Admin Dashboard"
+            >
+              <Shield className="size-3.5 text-purple-400" />
+              <span>Admin Panel</span>
+              <ExternalLink className="size-3 opacity-60 ml-0.5" />
+            </a>
+          )}
+
           {user ? (
             <div className="relative">
               <button
@@ -73,17 +87,47 @@ export default function SiteHeader({ onToggleSidebar, sidebarOpen = false }: Sit
                 <span className="hidden sm:inline-block max-w-[100px] truncate text-slate-200">
                   {user.full_name || user.username}
                 </span>
+                {isAdmin && (
+                  <span className="hidden lg:inline-block text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                    Admin
+                  </span>
+                )}
               </button>
 
               {/* User Dropdown */}
               {dropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[#141522] border border-white/10 shadow-2xl p-2 z-50 text-slate-200 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-3 py-2 border-b border-white/10 mb-1">
-                      <p className="text-sm font-semibold text-white truncate">{user.full_name || user.username}</p>
+                  <div className="absolute right-0 mt-2 w-60 rounded-2xl bg-[#141522] border border-white/10 shadow-2xl p-2 z-50 text-slate-200 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-2 border-b border-white/10 mb-1.5">
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <p className="text-sm font-semibold text-white truncate">{user.full_name || user.username}</p>
+                        {isAdmin ? (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 whitespace-nowrap">
+                            Admin & User
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                            User
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-400 truncate">{user.email}</p>
                     </div>
+
+                    {isAdmin && (
+                      <a
+                        href={`http://localhost:3001${currentToken ? `?token=${currentToken}` : ''}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-purple-200 hover:text-white bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 transition-all mb-1.5 shadow-sm"
+                      >
+                        <Shield className="size-4 text-purple-400" />
+                        <span>Admin Dashboard</span>
+                        <ExternalLink className="size-3 ml-auto opacity-70" />
+                      </a>
+                    )}
 
                     <Link
                       to="/favorites"

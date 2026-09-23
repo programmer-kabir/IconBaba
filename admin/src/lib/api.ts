@@ -73,15 +73,10 @@ export async function updateProfile(fullName?: string, password?: string) {
 
 // ==========================================
 // Admin Dashboard
-// ==========================================
 
 export async function getAdminDashboardStats() {
   return request<import('@/types/admin').DashboardStats>('/admin/dashboard/stats.php');
 }
-
-// ==========================================
-// Icons Management
-// ==========================================
 
 export async function getAdminIcons(params: {
   page?: number;
@@ -89,6 +84,7 @@ export async function getAdminIcons(params: {
   q?: string;
   category_id?: number;
   status?: string;
+  tier?: string;
   sort?: string;
 }) {
   const qp = new URLSearchParams();
@@ -97,6 +93,7 @@ export async function getAdminIcons(params: {
   if (params.q) qp.set('q', params.q);
   if (params.category_id) qp.set('category_id', params.category_id.toString());
   if (params.status && params.status !== 'all') qp.set('status', params.status);
+  if (params.tier && params.tier !== 'all') qp.set('tier', params.tier);
   if (params.sort) qp.set('sort', params.sort);
 
   return request<{
@@ -131,6 +128,50 @@ export async function uploadAdminIcon(data: {
   });
 }
 
+export interface BatchIconUploadItem {
+  name: string;
+  category_id?: number;
+  tags?: string;
+  status?: 'draft' | 'published' | 'archived';
+  is_premium?: boolean | number;
+  svg_outlined?: string;
+  svg_filled?: string;
+}
+
+export interface BatchUploadResponse {
+  total_received: number;
+  uploaded_count: number;
+  failed_count: number;
+  items: Array<{
+    id: number;
+    name: string;
+    slug: string;
+    category_id: number;
+    category_name: string;
+    status: string;
+    is_premium: boolean;
+    tags: string;
+  }>;
+  errors: Array<{
+    index: number;
+    name: string;
+    error: string;
+  }>;
+}
+
+export async function batchUploadAdminIcons(data: {
+  category_id?: number;
+  status?: 'draft' | 'published' | 'archived';
+  is_premium?: number | boolean;
+  icons: BatchIconUploadItem[];
+}) {
+  return request<BatchUploadResponse>('/admin/icons/batch_upload.php', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+
 export async function updateAdminIcon(data: {
   id: number;
   name?: string;
@@ -138,6 +179,7 @@ export async function updateAdminIcon(data: {
   category_id?: number;
   tags?: string;
   status?: 'draft' | 'published' | 'archived';
+  is_premium?: boolean;
   svg_outlined?: string;
   svg_filled?: string;
 }) {
@@ -245,10 +287,26 @@ export async function getAdminUsers(params: {
   }>(`/admin/users/list.php?${qp.toString()}`);
 }
 
-export async function updateAdminUserStatus(id: number, status?: 'active' | 'suspended', role?: 'user' | 'admin') {
-  return request<{ id: number; status: string; role: string }>('/admin/users/update_status.php', {
+export async function updateAdminUserStatus(
+  id: number,
+  status?: 'active' | 'suspended',
+  role?: 'user' | 'admin',
+  roles?: string[]
+) {
+  return request<{ id: number; status: string; role: string; roles: string[] }>('/admin/users/update_status.php', {
     method: 'POST',
-    body: JSON.stringify({ id, status, role }),
+    body: JSON.stringify({ id, status, role, roles }),
+  });
+}
+
+export async function getAdminRoles() {
+  return request<{ items: import('@/types/admin').SystemRoleItem[] }>('/admin/roles/list.php');
+}
+
+export async function createAdminRole(name: string, slug?: string, description?: string) {
+  return request<import('@/types/admin').SystemRoleItem>('/admin/roles/create.php', {
+    method: 'POST',
+    body: JSON.stringify({ name, slug, description }),
   });
 }
 

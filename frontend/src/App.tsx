@@ -13,6 +13,7 @@ import ProLicensePage from './pages/ProLicensePage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import RefundPolicyPage from './pages/RefundPolicyPage';
 import TermsPage from './pages/TermsPage';
+import AuthModal from './components/auth/AuthModal';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -45,6 +46,8 @@ export default function App() {
         {/* Fallback route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {/* Global Auth Modal mounted at root for all pages */}
+      <AuthModal />
     </>
   );
 }

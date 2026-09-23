@@ -24,6 +24,7 @@ export default function IconEditPage() {
   const [categoryId, setCategoryId] = useState<number>(0);
   const [tags, setTags] = useState('');
   const [status, setStatus] = useState<'published' | 'draft' | 'archived'>('published');
+  const [isPremium, setIsPremium] = useState<boolean>(false);
   const [svgOutlined, setSvgOutlined] = useState('');
   const [svgFilled, setSvgFilled] = useState('');
 
@@ -55,6 +56,7 @@ export default function IconEditPage() {
           setCategoryId(item.category_id);
           setTags(item.tags || '');
           setStatus(item.status);
+          setIsPremium(Boolean(item.is_premium));
           setSvgOutlined(item.variants?.outlined || '');
           setSvgFilled(item.variants?.filled || '');
         } else {
@@ -90,6 +92,7 @@ export default function IconEditPage() {
         category_id: categoryId,
         tags: tags.trim(),
         status,
+        is_premium: isPremium,
         svg_outlined: svgOutlined.trim() || undefined,
         svg_filled: svgFilled.trim() || undefined,
       });
@@ -268,6 +271,36 @@ export default function IconEditPage() {
                     {st}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Pricing Tier: Free vs Pro */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Access Tier</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPremium(false)}
+                  className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
+                    !isPremium
+                      ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 shadow-sm'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Free Icon
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPremium(true)}
+                  className={`py-2 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
+                    isPremium
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-sm shadow-amber-500/10'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span>👑</span>
+                  <span>Pro (Premium)</span>
+                </button>
               </div>
             </div>
           </div>

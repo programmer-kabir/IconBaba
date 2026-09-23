@@ -32,6 +32,9 @@ $newCategoryId = isset($data['category_id']) ? (int)$data['category_id'] : $oldC
 $status = isset($data['status']) && in_array($data['status'], ['published', 'draft', 'archived']) 
     ? $data['status'] 
     : $existing['status'];
+$isPremium = isset($data['is_premium']) 
+    ? ((int)(bool)$data['is_premium']) 
+    : (int)($existing['is_premium'] ?? 0);
 
 // Slug validation or regeneration
 if (!empty($data['slug'])) {
@@ -79,7 +82,7 @@ try {
     // Update icon record
     $updateStmt = $pdo->prepare("
         UPDATE icons 
-        SET name = :name, slug = :slug, category_id = :category_id, tags = :tags, status = :status, updated_at = NOW()
+        SET name = :name, slug = :slug, category_id = :category_id, tags = :tags, status = :status, is_premium = :is_premium, updated_at = NOW()
         WHERE id = :id
     ");
     $updateStmt->execute([
@@ -88,6 +91,7 @@ try {
         ':category_id' => $newCategoryId,
         ':tags' => $tags,
         ':status' => $status,
+        ':is_premium' => $isPremium,
         ':id' => $id
     ]);
 
@@ -152,6 +156,7 @@ try {
         'slug' => $slug,
         'category_id' => $newCategoryId,
         'status' => $status,
+        'is_premium' => (bool)$isPremium,
         'tags' => $tags
     ], 'Icon updated successfully.');
 

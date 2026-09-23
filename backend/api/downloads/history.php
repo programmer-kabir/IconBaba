@@ -20,6 +20,7 @@ $query = "
         i.id,
         i.name,
         i.slug,
+        i.is_premium,
         c.name AS category_name,
         c.slug AS category_slug,
         iv.style,
@@ -49,6 +50,7 @@ $formatted = array_map(function($d) {
             'slug' => $d['slug'],
             'category' => $d['category_name'] ?: 'Misc',
             'category_slug' => $d['category_slug'] ?: 'misc',
+            'is_premium' => (bool)$d['is_premium'],
             'style' => $d['style'] ?: 'outlined',
             'svg' => $d['svg_content']
         ]

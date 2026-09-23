@@ -5,9 +5,16 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/validator.php';
+require_once __DIR__ . '/../../helpers/rate_limit.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(false, null, 'Method not allowed', 405);
+}
+
+$clientIp = getClientIpAddress();
+$rateCheck = checkRateLimit($pdo, 'register', $clientIp, 8, 3600);
+if (!$rateCheck['allowed']) {
+    jsonResponse(false, null, "Too many registration attempts from this IP. Please try again later.", 429);
 }
 
 $input = getJsonInput();
@@ -28,8 +35,8 @@ if (!isValidEmail($email)) {
     jsonResponse(false, null, 'Invalid email address format', 400);
 }
 
-if (strlen($password) < 6) {
-    jsonResponse(false, null, 'Password must be at least 6 characters long', 400);
+if (strlen($password) < 8 || !preg_match('/[a-zA-Z]/', $password) || !preg_match('/\d/', $password)) {
+    jsonResponse(false, null, 'Password must be at least 8 characters long and contain both letters and numbers.', 400);
 }
 
 // Check if username or email already exists
@@ -82,6 +89,9 @@ try {
         ':expires_at' => $expiresAt
     ]);
 
+    // Assign default role in user_roles table
+    syncUserRoles($pdo, $userId, ['user']);
+
     $pdo->commit();
 
     jsonResponse(true, [
@@ -91,7 +101,8 @@ try {
             'username' => $username,
             'email' => $email,
             'full_name' => $fullName ?: $username,
-            'role' => 'user'
+            'role' => 'user',
+            'roles' => ['user']
         ]
     ], 'Registration successful', 201);
 

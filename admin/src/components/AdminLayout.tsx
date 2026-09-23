@@ -169,10 +169,23 @@ export default function AdminLayout() {
   useEffect(() => {
     async function checkAdminAuth() {
       try {
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const ssoToken = urlParams.get('token');
+          if (ssoToken) {
+            localStorage.setItem('iconbaba_token', ssoToken);
+            const url = new URL(window.location.href);
+            url.searchParams.delete('token');
+            window.history.replaceState({}, document.title, url.pathname + url.search);
+          }
+        }
+
         const res = await getMe();
         if (res.success && res.data?.user) {
-          if (res.data.user.role === 'admin') {
-            setCurrentUser(res.data.user);
+          const user = res.data.user;
+          const hasAdmin = user.roles?.includes('admin') || user.role === 'admin';
+          if (hasAdmin) {
+            setCurrentUser(user);
           } else {
             navigate('/login?error=forbidden');
           }
@@ -202,9 +215,12 @@ export default function AdminLayout() {
     );
   }
 
-  if (!currentUser || currentUser.role !== 'admin') {
+  const hasAdmin = currentUser?.roles?.includes('admin') || currentUser?.role === 'admin';
+  if (!currentUser || !hasAdmin) {
     return null;
   }
+
+  const currentToken = typeof window !== 'undefined' ? localStorage.getItem('iconbaba_token') : null;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased font-sans">
@@ -219,37 +235,39 @@ export default function AdminLayout() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <Link to="/" className="flex items-center gap-2 font-bold text-lg text-white">
-            <span className="w-7 h-7 bg-gradient-to-tr from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center text-white text-sm font-black shadow-md shadow-indigo-500/20">
-              IB
-            </span>
-            <span>IconBaba</span>
-            <span className="ml-1.5 px-2 py-0.5 text-xs font-semibold rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-              Admin
+          <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+            <img
+              src="/nav-logo.png"
+              alt="IconBaba"
+              className="h-9 sm:h-8 w-auto object-contain filter drop-shadow-[0_2px_10px_rgba(168,85,247,0.35)]"
+            />
+            <span className="px-2 py-0.5 text-[11px] font-semibold rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+              <span>Admin & User</span>
             </span>
           </Link>
         </div>
 
         <div className="flex items-center gap-3">
           <a
-            href="http://localhost:3000"
+            href={`http://localhost:3000${currentToken ? `?token=${currentToken}` : ''}`}
             target="_blank"
             rel="noreferrer"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-300 hover:text-white bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/30 rounded-lg transition-all shadow-sm shadow-purple-950"
+            title="Switch to Public User Site with your logged-in session"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
-            <span>Public Site</span>
+            <span>Switch to User View</span>
           </a>
 
           <div className="flex items-center gap-2 pl-3 border-l border-slate-800">
-            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white uppercase shadow">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-xs font-bold text-white uppercase shadow">
               {currentUser.username.substring(0, 2)}
             </div>
             <div className="hidden lg:block text-left text-xs leading-tight">
               <div className="font-semibold text-slate-200">{currentUser.full_name || currentUser.username}</div>
-              <div className="text-slate-400 text-[10px]">{currentUser.email}</div>
+              <div className="text-purple-400 text-[10px] font-medium">Roles: Admin & User</div>
             </div>
             <button
               onClick={handleLogout}
@@ -275,9 +293,8 @@ export default function AdminLayout() {
 
         {/* Sidebar */}
         <aside
-          className={`fixed md:sticky top-16 bottom-0 left-0 z-30 w-64 bg-slate-900/95 md:bg-slate-900/60 border-r border-slate-800/80 backdrop-blur-md flex flex-col transition-transform duration-200 ease-in-out ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-          }`}
+          className={`fixed md:sticky top-16 bottom-0 left-0 z-30 w-64 bg-slate-900/95 md:bg-slate-900/60 border-r border-slate-800/80 backdrop-blur-md flex flex-col transition-transform duration-200 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+            }`}
         >
           <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
             {navItems.map((section, idx) => (
@@ -296,11 +313,10 @@ export default function AdminLayout() {
                         key={item.href}
                         to={item.href}
                         onClick={() => setSidebarOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          isActive
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
                             ? 'bg-indigo-600 text-white font-semibold shadow-sm shadow-indigo-600/30'
                             : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                        }`}
+                          }`}
                       >
                         <span className={isActive ? 'text-white' : 'text-slate-400'}>
                           {item.icon}

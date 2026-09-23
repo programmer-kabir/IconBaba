@@ -37,6 +37,7 @@ export interface DashboardStats {
     email: string;
     full_name: string;
     role: 'user' | 'admin';
+    roles?: string[];
     status: 'active' | 'suspended';
     created_at: string;
   }>;
@@ -60,6 +61,7 @@ export interface AdminIconItem {
   tags: string;
   tags_array?: string[];
   status: 'draft' | 'published' | 'archived';
+  is_premium?: boolean;
   downloads_count: number;
   favorites_count: number;
   created_at: string;
@@ -96,6 +98,7 @@ export interface AdminUserItem {
   full_name: string;
   avatar_url?: string;
   role: 'user' | 'admin';
+  roles?: string[];
   status: 'active' | 'suspended';
   created_at: string;
   updated_at: string;
@@ -126,4 +129,13 @@ export interface AdminAuditLog {
   user_id: number;
   username: string;
   full_name: string;
+}
+
+export interface SystemRoleItem {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  created_at: string;
+  users_count: number;
 }

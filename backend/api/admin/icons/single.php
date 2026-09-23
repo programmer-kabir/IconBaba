@@ -57,6 +57,7 @@ foreach ($variants as $v) {
 }
 
 $icon['variants'] = $variantsMap;
+$icon['is_premium'] = (bool)($icon['is_premium'] ?? false);
 $icon['tags_array'] = !empty($icon['tags']) ? array_filter(array_map('trim', explode(',', $icon['tags']))) : [];
 
 jsonResponse(true, $icon, 'Icon retrieved successfully.');

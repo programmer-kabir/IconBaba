@@ -28,6 +28,7 @@ jsonResponse(true, [
         'full_name' => $user['full_name'] ?: $user['username'],
         'avatar_url' => $user['avatar_url'],
         'role' => $user['role'],
+        'roles' => getUserRoles($user),
         'created_at' => $user['created_at'],
         'stats' => [
             'favorites_count' => $favoritesCount,

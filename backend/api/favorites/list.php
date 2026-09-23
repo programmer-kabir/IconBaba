@@ -16,6 +16,7 @@ $query = "
         i.id,
         i.name,
         i.slug,
+        i.is_premium,
         c.name AS category_name,
         c.slug AS category_slug,
         f.created_at AS favorited_at,
@@ -40,6 +41,7 @@ $formatted = array_map(function($fav) {
         'slug' => $fav['slug'],
         'category' => $fav['category_name'] ?: 'Misc',
         'category_slug' => $fav['category_slug'] ?: 'misc',
+        'is_premium' => (bool)$fav['is_premium'],
         'favorited_at' => $fav['favorited_at'],
         'style' => $fav['style'] ?: 'outlined',
         'svg' => $fav['svg_content']

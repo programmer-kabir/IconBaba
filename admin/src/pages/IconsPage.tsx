@@ -23,6 +23,7 @@ export default function IconsPage() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>(undefined);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedTier, setSelectedTier] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
 
   // Bulk actions
@@ -56,6 +57,7 @@ export default function IconsPage() {
         q: search.trim(),
         category_id: selectedCategory,
         status: selectedStatus,
+        tier: selectedTier,
         sort: sortBy,
       });
 
@@ -69,7 +71,7 @@ export default function IconsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, selectedCategory, selectedStatus, sortBy]);
+  }, [page, search, selectedCategory, selectedStatus, selectedTier, sortBy]);
 
   useEffect(() => {
     fetchIcons();
@@ -131,6 +133,20 @@ export default function IconsPage() {
     }
   }
 
+  async function togglePremium(icon: AdminIconItem) {
+    const nextPremium = !icon.is_premium;
+    try {
+      const res = await updateAdminIcon({ id: icon.id, is_premium: nextPremium });
+      if (res.success) {
+        setIcons((prev) =>
+          prev.map((i) => (i.id === icon.id ? { ...i, is_premium: nextPremium } : i))
+        );
+      }
+    } catch (err) {
+      console.error('Toggle premium error:', err);
+    }
+  }
+
   // Handle single delete
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -174,7 +190,7 @@ export default function IconsPage() {
 
       {/* Filter & Search Bar */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Search Input */}
           <div className="relative">
             <input
@@ -230,6 +246,22 @@ export default function IconsPage() {
               <option value="published">Published</option>
               <option value="draft">Draft</option>
               <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          {/* Tier Filter (Free vs Pro) */}
+          <div>
+            <select
+              value={selectedTier}
+              onChange={(e) => {
+                setSelectedTier(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-amber-300 focus:outline-none focus:border-amber-500 transition-colors"
+            >
+              <option value="all">All Tiers (Free & Pro)</option>
+              <option value="free">Free Icons Only</option>
+              <option value="pro">👑 Pro Icons Only</option>
             </select>
           </div>
 
@@ -361,7 +393,20 @@ export default function IconsPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-100">{icon.name}</div>
+                      <div className="flex items-center gap-1.5 font-semibold text-slate-100">
+                        <span>{icon.name}</span>
+                        <button
+                          onClick={() => togglePremium(icon)}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                            icon.is_premium
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+                              : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-amber-300 hover:border-amber-500/40'
+                          }`}
+                          title={`Click to set as ${icon.is_premium ? 'Free' : 'Pro'}`}
+                        >
+                          {icon.is_premium ? '👑 PRO' : 'FREE'}
+                        </button>
+                      </div>
                       <div className="text-[11px] text-slate-500 font-mono">{icon.slug}</div>
                     </td>
                     <td className="py-3 px-4">

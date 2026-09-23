@@ -7,6 +7,7 @@ export interface User {
   full_name?: string;
   avatar_url?: string;
   role: 'user' | 'admin';
+  roles?: string[];
   status?: 'active' | 'suspended';
   created_at: string;
 }

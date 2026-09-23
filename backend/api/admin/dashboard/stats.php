@@ -44,12 +44,20 @@ $recentDownloads = $recentDownloadsStmt->fetchAll();
 
 // Recent 5 users
 $recentUsersStmt = $pdo->query("
-    SELECT id, username, email, full_name, role, status, created_at
-    FROM users
-    ORDER BY created_at DESC
+    SELECT u.id, u.username, u.email, u.full_name, u.status, u.created_at,
+           (SELECT GROUP_CONCAT(ur.role_slug SEPARATOR ',') FROM user_roles ur WHERE ur.user_id = u.id) AS db_roles
+    FROM users u
+    ORDER BY u.created_at DESC
     LIMIT 5
 ");
-$recentUsers = $recentUsersStmt->fetchAll();
+$recentUsers = $recentUsersStmt->fetchAll(PDO::FETCH_ASSOC);
+foreach ($recentUsers as &$ru) {
+    $uRoles = getUserRoles($ru);
+    $ru['roles'] = $uRoles;
+    $ru['role'] = in_array('admin', $uRoles) ? 'admin' : ($uRoles[0] ?? 'user');
+    unset($ru['db_roles']);
+}
+unset($ru);
 
 // Recent 10 audit logs
 $recentAuditStmt = $pdo->query("

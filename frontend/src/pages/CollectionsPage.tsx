@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Folder, Plus, Trash2, Sparkles, FolderOpen } from 'lucide-react';
 import SiteHeader from '@/components/header/SiteHeader';
 import IconDetailDrawer from '@/components/drawer/IconDetailDrawer';
-import AuthModal from '@/components/auth/AuthModal';
 import { Collection, IconItem } from '@/types/icon';
 import { getCollections, getCollection, createCollection, deleteCollection } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useIconCustomization } from '@/context/IconCustomizationContext';
 import { applyCustomizationToSvg } from '@/lib/svg-utils';
+import ProtectedCanvasPreview from '@/components/common/ProtectedCanvasPreview';
 
 export default function CollectionsPage() {
   const { user, setShowAuthModal, setAuthMode } = useAuth();
@@ -196,15 +196,28 @@ export default function CollectionsPage() {
                         <div
                           key={icon.id}
                           onClick={() => setSelectedIcon(icon)}
-                          className="group aspect-square rounded-2xl p-3 flex flex-col items-center justify-center relative overflow-hidden cursor-pointer bg-[#141522] border border-white/5 hover:border-purple-500/40 transition-all hover:shadow-xl"
+                          onContextMenu={(e) => e.preventDefault()}
+                          className={`group aspect-square rounded-2xl p-3 flex flex-col items-center justify-center relative overflow-hidden cursor-pointer select-none bg-[#141522] border transition-all hover:shadow-xl ${
+                            icon.is_premium
+                              ? 'border-amber-500/20 hover:border-amber-500/50'
+                              : 'border-white/5 hover:border-purple-500/40'
+                          }`}
                         >
+                          {icon.is_premium && (
+                            <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[9px] font-black tracking-wider uppercase flex items-center gap-1 shadow-sm pointer-events-none">
+                              <span>👑</span>
+                              <span className="font-extrabold">PRO</span>
+                            </div>
+                          )}
                           <div
-                            className="relative z-10 flex items-center justify-center mb-2"
+                            className="relative z-10 flex items-center justify-center mb-2 pointer-events-none"
                             style={{ width: `${customization.size}px`, height: `${customization.size}px` }}
-                            dangerouslySetInnerHTML={{
-                              __html: applyCustomizationToSvg(icon.svg, customization, style),
-                            }}
-                          />
+                          >
+                            <ProtectedCanvasPreview
+                              svgContent={applyCustomizationToSvg(icon.svg, customization, style)}
+                              size={customization.size}
+                            />
+                          </div>
                           <span className="relative z-10 text-[11px] font-medium text-slate-400 group-hover:text-slate-100 truncate w-full text-center">
                             {icon.name}
                           </span>
@@ -233,8 +246,6 @@ export default function CollectionsPage() {
         onOpenAddToCollection={() => {}}
         onSelectIcon={(icon) => setSelectedIcon(icon)}
       />
-
-      <AuthModal />
     </div>
   );
 }

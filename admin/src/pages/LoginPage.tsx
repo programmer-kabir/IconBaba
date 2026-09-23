@@ -18,7 +18,8 @@ export default function LoginPage() {
     try {
       const res = await loginUser(login, password);
       if (res.success && res.data?.token) {
-        if (res.data.user.role !== 'admin') {
+        const hasAdmin = res.data.user.roles?.includes('admin') || res.data.user.role === 'admin';
+        if (!hasAdmin) {
           setError('Access denied. Administrator privileges required.');
           return;
         }
@@ -37,11 +38,18 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-violet-500 text-white font-black text-xl shadow-lg shadow-indigo-500/20">
-            IB
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">IconBaba Admin</h1>
+        <div className="text-center space-y-3">
+          <img
+            src="/nav-logo.png"
+            alt="IconBaba"
+            className="h-14 mx-auto object-contain filter drop-shadow-[0_4px_20px_rgba(168,85,247,0.4)]"
+          />
+          <h1 className="text-lg font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
+            Admin Dashboard
+            <span className="ml-1 px-2 py-0.5 text-xs font-semibold rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              Portal
+            </span>
+          </h1>
           <p className="text-xs text-slate-400">Sign in with your administrator credentials</p>
         </div>
 

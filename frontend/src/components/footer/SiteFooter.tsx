@@ -5,17 +5,16 @@ import { Sparkles, Github, Twitter, Mail, ShieldCheck } from 'lucide-react';
 export default function SiteFooter() {
   return (
     <footer className="w-full border-t border-white/10 bg-[#0a0b10] text-slate-400">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
           {/* Brand & Description (2 cols on large screens) */}
           <div className="lg:col-span-2 space-y-4">
-            <Link to="/" className="inline-flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-              <div className="relative size-8 flex items-center justify-center rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 shadow-md shadow-purple-500/20">
-                <Sparkles className="size-4 text-white" />
-              </div>
-              <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-purple-400 via-pink-400 to-purple-300 bg-clip-text text-transparent">
-                IconBaba
-              </span>
+            <Link to="/" className="inline-flex items-center hover:opacity-90 transition-opacity">
+              <img
+                src="/nav-logo.png"
+                alt="IconBaba"
+                className="h-10 w-auto object-contain filter drop-shadow-[0_2px_12px_rgba(168,85,247,0.35)]"
+              />
             </Link>
             <p className="text-xs sm:text-sm text-slate-400 max-w-sm leading-relaxed">
               Precision-crafted vector icon library for modern designers and developers. Explore 5,000+ customizable icons across 42 categories in Outlined and Filled styles.

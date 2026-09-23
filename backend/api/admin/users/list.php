@@ -23,9 +23,9 @@ if (!empty($search)) {
     $params[':search'] = '%' . $search . '%';
 }
 
-if (!empty($role) && in_array($role, ['user', 'admin'])) {
-    $where[] = "u.role = :role";
-    $params[':role'] = $role;
+if (!empty($role)) {
+    $where[] = "EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role_slug = :role_slug)";
+    $params[':role_slug'] = $role;
 }
 
 if (!empty($status) && in_array($status, ['active', 'suspended'])) {
@@ -45,7 +45,8 @@ $totalPages = ceil($total / $limit);
 // Items query
 $itemsSql = "
     SELECT 
-        u.id, u.username, u.email, u.full_name, u.avatar_url, u.role, u.status, u.created_at, u.updated_at,
+        u.id, u.username, u.email, u.full_name, u.avatar_url, u.status, u.created_at, u.updated_at,
+        (SELECT GROUP_CONCAT(ur.role_slug SEPARATOR ',') FROM user_roles ur WHERE ur.user_id = u.id) AS db_roles,
         (SELECT COUNT(*) FROM favorites f WHERE f.user_id = u.id) AS favorites_count,
         (SELECT COUNT(*) FROM collections c WHERE c.user_id = u.id) AS collections_count,
         (SELECT COUNT(*) FROM downloads d WHERE d.user_id = u.id) AS downloads_count
@@ -64,6 +65,9 @@ foreach ($users as &$user) {
     $user['favorites_count'] = (int)$user['favorites_count'];
     $user['collections_count'] = (int)$user['collections_count'];
     $user['downloads_count'] = (int)$user['downloads_count'];
+    $userRoles = getUserRoles($user);
+    $user['roles'] = $userRoles;
+    $user['role'] = in_array('admin', $userRoles) ? 'admin' : ($userRoles[0] ?? 'user');
 }
 
 jsonResponse(true, [

@@ -47,7 +47,7 @@ export default function PricingPage() {
     <div className="min-h-screen flex flex-col bg-[#0d0e15]">
       <SiteHeader />
 
-      <main className="flex-1 py-12 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full">
+      <main className="flex-1 py-12 sm:py-20 px-4 sm:px-6 lg:px-8 mx-auto w-full">
         {/* Header Section */}
         <div className="text-center max-w-2xl mx-auto mb-14 sm:mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-medium mb-4">
@@ -65,7 +65,7 @@ export default function PricingPage() {
 
         {/* Pricing Cards Grid */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto animate-pulse">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-7xl mx-auto animate-pulse">
             {[1, 2].map((i) => (
               <div
                 key={i}
@@ -74,7 +74,7 @@ export default function PricingPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-3xl mx-auto items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 max-w-7xl mx-auto items-stretch">
             {plans.map((plan) => {
               const isTeam = plan.name.toLowerCase().includes('team');
               const extraSeatPrice = plan.extra_seat_price || 20;

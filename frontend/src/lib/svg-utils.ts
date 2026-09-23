@@ -1,6 +1,30 @@
 // frontend/lib/svg-utils.ts
 import { IconCustomization } from '@/types/icon';
 
+const VECTOR_OBFUSCATION_KEY = 'ib_vector_sec_2026';
+
+/**
+ * Decodes obfuscated vector payload into clean standard SVG XML
+ */
+export function deobfuscateVector(encoded?: string): string {
+  if (!encoded) return '';
+  const trimmed = encoded.trim();
+  if (trimmed.startsWith('<svg') || trimmed.startsWith('<?xml')) {
+    return encoded;
+  }
+  try {
+    const binary = atob(trimmed);
+    let decoded = '';
+    const kLen = VECTOR_OBFUSCATION_KEY.length;
+    for (let i = 0; i < binary.length; i++) {
+      decoded += String.fromCharCode(binary.charCodeAt(i) ^ VECTOR_OBFUSCATION_KEY.charCodeAt(i % kLen));
+    }
+    return decoded;
+  } catch {
+    return encoded;
+  }
+}
+
 /**
  * Dynamically applies user customization (color, size, stroke-width, linecap, linejoin) to an SVG string.
  */
@@ -49,22 +73,39 @@ export function applyCustomizationToSvg(
 
   // 4. Handle style: 'filled' vs 'outlined'
   if (style === 'filled') {
-    // Replace all fills (currentColor, hex, rgb, or named) with custom.color (EXCEPT fill="none" and fill="transparent")
-    customized = customized.replace(/(?<![a-zA-Z-])fill=(["'])(?!none\b|transparent\b)[^"']*\1/gi, `fill="${custom.color}"`);
-    
-    // Also replace inline style="...fill: ..."
-    customized = customized.replace(/fill\s*:\s*(?!none\b|transparent\b)[^;}"']+/gi, `fill: ${custom.color}`);
+    // Check if this SVG is inherently an outline-only SVG (has fill="none" and stroke)
+    const isInherentlyOutline =
+      /(?<![a-zA-Z-])fill=["']none["']/i.test(customized) &&
+      (/(?<![a-zA-Z-])stroke=/i.test(customized) || /stroke-width/i.test(customized));
 
-    // If root <svg fill="none"> is present, convert it to fill="custom.color" so solid shapes inherit it
-    customized = customized.replace(/(<svg\b[^>]*?)\s+fill=(["'])none\2/gi, `$1 fill="${custom.color}"`);
+    if (isInherentlyOutline) {
+      // NEVER force fill on an outline-only SVG because open stroke paths will deform into solid polygon blobs!
+      // Keep fill="none" and color the strokes properly.
+      customized = customized.replace(/(?<![a-zA-Z-])stroke=(["'])(?!none\b|transparent\b)[^"']*\1/gi, `stroke="${custom.color}"`);
+      if (!/(?<![a-zA-Z-])stroke=/.test(customized)) {
+        customized = customized.replace('<svg', `<svg stroke="${custom.color}"`);
+      }
+      if (customized.includes('stroke-width=')) {
+        customized = customized.replace(/stroke-width="[^"]*"/g, `stroke-width="${custom.strokeWidth}"`);
+      }
+    } else {
+      // Genuine filled SVG (solid shapes)
+      // Replace all fills (currentColor, hex, rgb, or named) with custom.color (EXCEPT fill="none" and fill="transparent")
+      customized = customized.replace(/(?<![a-zA-Z-])fill=(["'])(?!none\b|transparent\b)[^"']*\1/gi, `fill="${custom.color}"`);
+      
+      // Also replace inline style="...fill: ..."
+      customized = customized.replace(/fill\s*:\s*(?!none\b|transparent\b)[^;}"']+/gi, `fill: ${custom.color}`);
 
-    // If root <svg> has NO fill attribute, set default fill to custom.color
-    if (!/(?<![a-zA-Z-])fill=/.test(customized)) {
-      customized = customized.replace('<svg', `<svg fill="${custom.color}"`);
+      // If root <svg fill="..."> is present, update it
+      if (/(<svg\b[^>]*?)\s+fill=(["'])[^"']*\2/gi.test(customized)) {
+        customized = customized.replace(/(<svg\b[^>]*?)\s+fill=(["'])[^"']*\2/gi, `$1 fill="${custom.color}"`);
+      } else {
+        customized = customized.replace('<svg', `<svg fill="${custom.color}"`);
+      }
+
+      // If strokes exist with currentColor or hardcoded color, match them to custom.color
+      customized = customized.replace(/(?<![a-zA-Z-])stroke=(["'])(?!none\b|transparent\b)[^"']*\1/gi, `stroke="${custom.color}"`);
     }
-
-    // If strokes exist with currentColor or hardcoded color, match them to custom.color
-    customized = customized.replace(/(?<![a-zA-Z-])stroke=(["'])(?!none\b|transparent\b)[^"']*\1/gi, `stroke="${custom.color}"`);
   } else {
     // style === 'outlined'
     // Replace all strokes with custom.color (EXCEPT stroke="none" and stroke="transparent")

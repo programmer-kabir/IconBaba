@@ -36,6 +36,7 @@ $itemsStmt = $pdo->prepare("
         i.id,
         i.name,
         i.slug,
+        i.is_premium,
         c.name AS category_name,
         c.slug AS category_slug,
         ci.created_at AS added_at,
@@ -58,6 +59,7 @@ $formattedItems = array_map(function($item) {
         'slug' => $item['slug'],
         'category' => $item['category_name'] ?: 'Misc',
         'category_slug' => $item['category_slug'] ?: 'misc',
+        'is_premium' => (bool)$item['is_premium'],
         'added_at' => $item['added_at'],
         'style' => $item['style'] ?: 'outlined',
         'svg' => $item['svg_content']

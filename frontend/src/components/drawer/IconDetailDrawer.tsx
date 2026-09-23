@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   X,
   Download,
@@ -12,8 +13,10 @@ import {
   FolderPlus,
   Sliders,
   Sparkles,
+  Zap,
+  Lock,
 } from 'lucide-react';
-import { IconItem, StrokeLinecap, StrokeLinejoin } from '@/types/icon';
+import { IconItem, StrokeLinecap, StrokeLinejoin, QuotaStatus } from '@/types/icon';
 import { useIconCustomization } from '@/context/IconCustomizationContext';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -30,7 +33,10 @@ import {
   logDownload,
   getIcon,
   getIcons,
+  getQuotaStatus,
+  trackExport,
 } from '@/lib/api';
+import PricingModal from '@/components/pricing/PricingModal';
 
 interface IconDetailDrawerProps {
   icon: IconItem | null;
@@ -48,8 +54,24 @@ export default function IconDetailDrawer({
   const { customization: globalCustomization, style: globalStyle } = useIconCustomization();
   const { user, setShowAuthModal, setAuthMode } = useAuth();
 
+  const isProUser = Boolean(
+    user && (
+      ['pro', 'premium', 'admin'].includes(user.role?.toLowerCase()) ||
+      (user.roles && user.roles.some((r) => ['pro', 'premium', 'admin'].includes(r.toLowerCase())))
+    )
+  );
+
   // Active icon inside modal
   const [currentIcon, setCurrentIcon] = useState<IconItem | null>(icon);
+  const isPremiumIcon = Boolean(
+    currentIcon?.is_premium === true ||
+    Number((currentIcon as any)?.is_premium) === 1 ||
+    (currentIcon as any)?.is_premium === '1' ||
+    icon?.is_premium === true ||
+    Number((icon as any)?.is_premium) === 1 ||
+    (currentIcon as any)?.tier === 'pro'
+  );
+  const isIconLocked = Boolean(isPremiumIcon && !isProUser);
   const [localStyle, setLocalStyle] = useState<'outlined' | 'filled'>(globalStyle);
   const [variantsMap, setVariantsMap] = useState<{ outlined?: string; filled?: string }>({});
   const [relatedVariants, setRelatedVariants] = useState<IconItem[]>([]);
@@ -63,6 +85,14 @@ export default function IconDetailDrawer({
   const [isFavorited, setIsFavorited] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
   const [downloadingPng, setDownloadingPng] = useState(false);
+  const [quota, setQuota] = useState<QuotaStatus | null>(null);
+
+  // Pricing Modal state
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [pricingReason, setPricingReason] = useState<'pro_icon' | 'quota_reached' | 'general'>('pro_icon');
+
+  const isDailyLimitReached = Boolean(user && quota && !quota.is_unlimited && quota.remaining <= 0);
+  const isActionLocked = Boolean(!user || isIconLocked || isDailyLimitReached);
 
   // Sync currentIcon when icon prop changes
   useEffect(() => {
@@ -74,6 +104,17 @@ export default function IconDetailDrawer({
       setCurrentIcon(null);
     }
   }, [icon]);
+
+  // Fetch daily export quota status
+  useEffect(() => {
+    if (icon) {
+      getQuotaStatus().then((res) => {
+        if (res.success && res.data) {
+          setQuota(res.data);
+        }
+      });
+    }
+  }, [icon, user]);
 
   // Handle clean close
   const handleClose = () => {
@@ -100,8 +141,13 @@ export default function IconDetailDrawer({
 
     // 1. Fetch single icon variants (both outlined and filled)
     getIcon(currentIcon.id).then((res) => {
-      if (isMounted && res.success && res.data?.variants) {
-        setVariantsMap(res.data.variants);
+      if (isMounted && res.success && res.data) {
+        if (res.data.variants) {
+          setVariantsMap(res.data.variants);
+        }
+        if (res.data.is_premium !== undefined) {
+          setCurrentIcon((prev) => (prev ? { ...prev, is_premium: Boolean(res.data!.is_premium) } : null));
+        }
       }
     });
 
@@ -149,10 +195,73 @@ export default function IconDetailDrawer({
 
   const customizedSvg = applyCustomizationToSvg(rawSvg, localCustom, localStyle);
 
+  // Layer 4 Security: Validates quota before allowing copy or download
+  const verifyAndConsumeQuota = async (action: 'copy' | 'download', format: 'svg' | 'png' | 'jsx'): Promise<boolean> => {
+    if (isIconLocked) {
+      setPricingReason('pro_icon');
+      setShowPricingModal(true);
+      return false;
+    }
+    if (!user) {
+      setAuthMode('login');
+      setShowAuthModal(true);
+      return false;
+    }
+    if (isDailyLimitReached) {
+      setPricingReason('quota_reached');
+      setShowPricingModal(true);
+      return false;
+    }
+    if (!currentIcon) return false;
+    const res = await trackExport({
+      iconId: currentIcon.id,
+      action,
+      format,
+      size: localCustom.size,
+    });
+
+    if (!res.success) {
+      if (res.data?.require_login || res.message?.toLowerCase().includes('guest limit') || res.message?.toLowerCase().includes('sign in')) {
+        setAuthMode('login');
+        setShowAuthModal(true);
+        return false;
+      }
+      if (res.data?.require_pro || res.message?.toLowerCase().includes('free limit') || res.message?.toLowerCase().includes('pro')) {
+        setPricingReason(isPremiumIcon ? 'pro_icon' : 'quota_reached');
+        setShowPricingModal(true);
+        return false;
+      }
+      return false;
+    }
+
+    if (res.data?.quota) {
+      setQuota(res.data.quota);
+    }
+    return true;
+  };
+
   // Copy SVG
   const handleCopySvg = async () => {
-    const ok = await copyToClipboard(customizedSvg);
-    if (ok) {
+    if (isIconLocked) {
+      setPricingReason('pro_icon');
+      setShowPricingModal(true);
+      return;
+    }
+    if (!user) {
+      setAuthMode('login');
+      setShowAuthModal(true);
+      return;
+    }
+    if (isDailyLimitReached) {
+      setPricingReason('quota_reached');
+      setShowPricingModal(true);
+      return;
+    }
+    const ok = await verifyAndConsumeQuota('copy', 'svg');
+    if (!ok) return;
+
+    const copied = await copyToClipboard(customizedSvg);
+    if (copied) {
       setCopiedType('svg');
       setTimeout(() => setCopiedType(null), 2000);
     }
@@ -160,13 +269,31 @@ export default function IconDetailDrawer({
 
   // Copy JSX
   const handleCopyJsx = async () => {
+    if (isIconLocked) {
+      setPricingReason('pro_icon');
+      setShowPricingModal(true);
+      return;
+    }
+    if (!user) {
+      setAuthMode('login');
+      setShowAuthModal(true);
+      return;
+    }
+    if (isDailyLimitReached) {
+      setPricingReason('quota_reached');
+      setShowPricingModal(true);
+      return;
+    }
+    const ok = await verifyAndConsumeQuota('copy', 'jsx');
+    if (!ok) return;
+
     const compName = currentIcon.name
       .split('-')
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join('');
     const jsx = svgToJsx(customizedSvg, `Icon${compName}`);
-    const ok = await copyToClipboard(jsx);
-    if (ok) {
+    const copied = await copyToClipboard(jsx);
+    if (copied) {
       setCopiedType('jsx');
       setTimeout(() => setCopiedType(null), 2000);
     }
@@ -174,16 +301,50 @@ export default function IconDetailDrawer({
 
   // Download SVG
   const handleDownloadSvg = async () => {
+    if (isIconLocked) {
+      setPricingReason('pro_icon');
+      setShowPricingModal(true);
+      return;
+    }
+    if (!user) {
+      setAuthMode('login');
+      setShowAuthModal(true);
+      return;
+    }
+    if (isDailyLimitReached) {
+      setPricingReason('quota_reached');
+      setShowPricingModal(true);
+      return;
+    }
+    const ok = await verifyAndConsumeQuota('download', 'svg');
+    if (!ok) return;
+
     downloadSvg(customizedSvg, `${currentIcon.name}-${localStyle}-${localCustom.size}px`);
-    await logDownload(currentIcon.id, 'svg', localCustom.size);
   };
 
   // Download PNG
   const handleDownloadPng = async () => {
+    if (isIconLocked) {
+      setPricingReason('pro_icon');
+      setShowPricingModal(true);
+      return;
+    }
+    if (!user) {
+      setAuthMode('login');
+      setShowAuthModal(true);
+      return;
+    }
+    if (isDailyLimitReached) {
+      setPricingReason('quota_reached');
+      setShowPricingModal(true);
+      return;
+    }
+    const ok = await verifyAndConsumeQuota('download', 'png');
+    if (!ok) return;
+
     setDownloadingPng(true);
     try {
       await downloadPng(customizedSvg, `${currentIcon.name}-${localStyle}-${localCustom.size}px`, localCustom.size * 2);
-      await logDownload(currentIcon.id, 'png', localCustom.size);
     } catch (err) {
       console.error('PNG download failed:', err);
     } finally {
@@ -245,7 +406,15 @@ export default function IconDetailDrawer({
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 sticky top-0 bg-[#12131d]/95 backdrop-blur-md z-10">
           <div>
-            <h3 className="text-base font-bold text-white tracking-tight">{currentIcon.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-white tracking-tight">{currentIcon.name}</h3>
+              {currentIcon.is_premium && (
+                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black tracking-wider uppercase flex items-center gap-1 shadow-sm">
+                  <span>👑</span>
+                  <span>PRO</span>
+                </span>
+              )}
+            </div>
             <span className="text-xs text-purple-400 font-medium">{currentIcon.category}</span>
           </div>
 
@@ -398,11 +567,16 @@ export default function IconDetailDrawer({
               {/* Filled variant button */}
               <button
                 type="button"
+                disabled={!Boolean(variantsMap.filled)}
                 onClick={() => setLocalStyle('filled')}
-                className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${localStyle === 'filled'
+                className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${
+                  !variantsMap.filled
+                    ? 'opacity-35 cursor-not-allowed bg-black/20 border-white/5 text-slate-500'
+                    : localStyle === 'filled'
                     ? 'bg-purple-600/20 border-purple-500/50 text-white shadow-md shadow-purple-600/10'
                     : 'bg-black/30 border-white/5 text-slate-400 hover:text-white hover:bg-white/5'
-                  }`}
+                }`}
+                title={!variantsMap.filled ? 'Filled variant is not available for this stroke icon' : 'Switch to filled'}
               >
                 <div
                   className="size-7 flex items-center justify-center shrink-0"
@@ -410,56 +584,252 @@ export default function IconDetailDrawer({
                     __html: applyCustomizationToSvg(
                       variantsMap.filled || currentIcon.svg,
                       { ...localCustom, size: 22 },
-                      'filled'
+                      variantsMap.filled ? 'filled' : 'outlined'
                     ),
                   }}
                 />
                 <div className="truncate">
                   <div className="text-xs font-semibold">Filled</div>
-                  <div className="text-[10px] text-slate-400">Solid vector</div>
+                  <div className="text-[10px] text-slate-400">
+                    {variantsMap.filled ? 'Solid vector' : 'Outline only'}
+                  </div>
                 </div>
               </button>
             </div>
           </div>
 
+          {/* Daily Quota Indicator Badge */}
+          <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-xs">
+            <div className="flex items-center gap-2">
+              {!user ? (
+                <div
+                  onClick={() => {
+                    setAuthMode('login');
+                    setShowAuthModal(true);
+                  }}
+                  className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white transition-colors"
+                >
+                  <Lock className="size-3.5 text-amber-400" />
+                  <span className="text-[11px]">
+                    Downloads & vector copying locked • <strong className="text-purple-400 hover:underline">Sign in to unlock</strong>
+                  </span>
+                </div>
+              ) : quota?.is_unlimited ? (
+                <span className="flex items-center gap-1.5 text-amber-400 font-semibold text-[11px]">
+                  <Zap className="size-3.5 fill-amber-400" /> Pro Member • Unlimited Access
+                </span>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className={`size-2 rounded-full ${quota?.remaining && quota.remaining > 5 ? 'bg-emerald-400' : (quota?.remaining ?? 0) > 0 ? 'bg-amber-400' : 'bg-red-400'} animate-pulse`} />
+                  <span className="text-slate-300 text-[11px]">
+                    Daily Free Quota: <strong className="text-white font-mono">{quota?.remaining ?? 20}/{quota?.limit ?? 20}</strong> icons left
+                  </span>
+                </div>
+              )}
+            </div>
+            {!user ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('login');
+                  setShowAuthModal(true);
+                }}
+                className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-0.5 cursor-pointer"
+              >
+                Sign In ↗
+              </button>
+            ) : !quota?.is_unlimited ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setPricingReason('general');
+                  setShowPricingModal(true);
+                }}
+                className="text-[10px] font-semibold text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-0.5 cursor-pointer"
+              >
+                Upgrade to Pro ↗
+              </button>
+            ) : null}
+          </div>
+
+          {/* Pro Icon Banner if icon is locked */}
+          {isIconLocked && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-yellow-500/5 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg shadow-amber-500/5">
+              <div className="flex items-center gap-3 text-center sm:text-left">
+                <div className="size-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 text-lg shrink-0">
+                  👑
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-amber-200">Exclusive Pro Icon</h4>
+                  <p className="text-[11px] text-amber-300/80">
+                    {user ? 'This vector icon is exclusive to Pro members. Upgrade to Pro to download and copy with unlimited commercial license.' : 'Sign in to your Pro account or upgrade to unlock this vector icon.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPricingReason('pro_icon');
+                  setShowPricingModal(true);
+                }}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs shadow-md shadow-amber-500/25 transition-all shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>👑</span>
+                <span>Upgrade to Pro</span>
+              </button>
+            </div>
+          )}
+
+          {/* Daily Limit Reached Banner */}
+          {!isIconLocked && isDailyLimitReached && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-500/15 via-rose-500/10 to-amber-500/10 border border-rose-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg shadow-rose-500/5">
+              <div className="flex items-center gap-3 text-center sm:text-left">
+                <div className="size-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-300 text-lg shrink-0">
+                  ⚡
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-rose-200">Daily Free Limit Reached (20/20)</h4>
+                  <p className="text-[11px] text-slate-300">
+                    You have used your 20 free vector icon downloads for today. Upgrade to Pro for unlimited downloads & copies!
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPricingReason('quota_reached');
+                  setShowPricingModal(true);
+                }}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-md shadow-purple-500/25 transition-all shrink-0 flex items-center justify-center gap-1.5 cursor-pointer text-center"
+              >
+                <span>Upgrade to Pro ↗</span>
+              </button>
+            </div>
+          )}
+
           {/* Action Buttons: Download SVG, Download PNG, Copy SVG, Copy JSX */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              onClick={handleDownloadSvg}
-              aria-label="Download SVG file"
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-600/20 transition-all"
-            >
-              <Download className="size-4" />
-              Download SVG
-            </button>
+          <div className="space-y-2.5">
+            {!user && (
+              <div
+                onClick={() => {
+                  setAuthMode('login');
+                  setShowAuthModal(true);
+                }}
+                className="p-3 rounded-2xl bg-gradient-to-r from-purple-500/15 via-purple-500/10 to-indigo-500/10 border border-purple-500/25 hover:border-purple-500/40 flex items-center justify-between gap-2 cursor-pointer transition-all group shadow-sm"
+              >
+                <div className="flex items-center gap-2.5 text-xs text-purple-200">
+                  <div className="size-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
+                    <Lock className="size-3.5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-white block text-[11px]">Actions Locked</span>
+                    <span className="text-[10px] text-slate-300">Sign in to unlock free SVG & PNG downloads and JSX copies</span>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold text-purple-400 group-hover:text-purple-300 flex items-center gap-1 shrink-0 bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/20">
+                  Sign In →
+                </span>
+              </div>
+            )}
 
-            <button
-              onClick={handleDownloadPng}
-              disabled={downloadingPng}
-              aria-label="Download PNG file"
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-            >
-              <Download className="size-4" />
-              {downloadingPng ? 'Exporting...' : 'Download PNG'}
-            </button>
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Download SVG */}
+              <button
+                onClick={handleDownloadSvg}
+                aria-label="Download SVG file"
+                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold transition-all relative group cursor-pointer ${
+                  isIconLocked
+                    ? 'bg-amber-500/15 text-amber-200 border border-amber-500/40 hover:bg-amber-500/25 hover:border-amber-400/60 shadow-md'
+                    : isActionLocked
+                    ? 'bg-purple-600/30 text-purple-200 border border-purple-500/40 hover:bg-purple-600/50 hover:border-purple-400/60 shadow-md'
+                    : 'text-white bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-600/20'
+                }`}
+              >
+                {isActionLocked ? (
+                  <Lock className="size-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                ) : (
+                  <Download className="size-4" />
+                )}
+                <span>Download SVG</span>
+                {isIconLocked && (
+                  <Lock className="size-3 text-amber-400/90 ml-1 shrink-0" />
+                )}
+              </button>
 
-            <button
-              onClick={handleCopySvg}
-              aria-label="Copy SVG code to clipboard"
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-            >
-              {copiedType === 'svg' ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
-              {copiedType === 'svg' ? 'Copied SVG!' : 'Copy SVG'}
-            </button>
+              {/* Download PNG */}
+              <button
+                onClick={handleDownloadPng}
+                disabled={downloadingPng}
+                aria-label="Download PNG file"
+                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold transition-all relative group cursor-pointer ${
+                  isIconLocked
+                    ? 'text-amber-200 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400/50'
+                    : isActionLocked
+                    ? 'text-slate-300 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/40'
+                    : 'text-slate-200 bg-white/5 hover:bg-white/10 border border-white/10'
+                }`}
+              >
+                {isActionLocked ? (
+                  <Lock className="size-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                ) : (
+                  <Download className="size-4" />
+                )}
+                <span>{downloadingPng ? 'Exporting...' : 'Download PNG'}</span>
+                {isIconLocked && (
+                  <Lock className="size-3 text-amber-400/90 ml-1 shrink-0" />
+                )}
+              </button>
 
-            <button
-              onClick={handleCopyJsx}
-              aria-label="Copy React JSX component code to clipboard"
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-            >
-              {copiedType === 'jsx' ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
-              {copiedType === 'jsx' ? 'Copied JSX!' : 'Copy React JSX'}
-            </button>
+              {/* Copy SVG */}
+              <button
+                onClick={handleCopySvg}
+                aria-label="Copy SVG code to clipboard"
+                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold transition-all relative group cursor-pointer ${
+                  isIconLocked
+                    ? 'text-amber-200 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400/50'
+                    : isActionLocked
+                    ? 'text-slate-300 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/40'
+                    : 'text-slate-200 bg-white/5 hover:bg-white/10 border border-white/10'
+                }`}
+              >
+                {isActionLocked ? (
+                  <Lock className="size-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                ) : copiedType === 'svg' ? (
+                  <Check className="size-4 text-emerald-400" />
+                ) : (
+                  <Copy className="size-4" />
+                )}
+                <span>{copiedType === 'svg' ? 'Copied SVG!' : 'Copy SVG'}</span>
+                {isIconLocked && (
+                  <Lock className="size-3 text-amber-400/90 ml-1 shrink-0" />
+                )}
+              </button>
+
+              {/* Copy React JSX */}
+              <button
+                onClick={handleCopyJsx}
+                aria-label="Copy React JSX component code to clipboard"
+                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold transition-all relative group cursor-pointer ${
+                  isIconLocked
+                    ? 'text-amber-200 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400/50'
+                    : isActionLocked
+                    ? 'text-slate-300 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/40'
+                    : 'text-slate-200 bg-white/5 hover:bg-white/10 border border-white/10'
+                }`}
+              >
+                {isActionLocked ? (
+                  <Lock className="size-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                ) : copiedType === 'jsx' ? (
+                  <Check className="size-4 text-emerald-400" />
+                ) : (
+                  <Copy className="size-4" />
+                )}
+                <span>{copiedType === 'jsx' ? 'Copied JSX!' : 'Copy React JSX'}</span>
+                {isIconLocked && (
+                  <Lock className="size-3 text-amber-400/90 ml-1 shrink-0" />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Customization Details Controls (LOCAL TO THIS ICON ONLY) */}
@@ -691,6 +1061,14 @@ export default function IconDetailDrawer({
           </div>
         </div>
       </div>
+
+      {/* Pricing Modal */}
+      <PricingModal
+        isOpen={showPricingModal}
+        onClose={() => setShowPricingModal(false)}
+        reason={pricingReason}
+        iconName={currentIcon?.name}
+      />
     </>
   );
 }

@@ -1,13 +1,15 @@
 // frontend/src/pages/HomePage.tsx
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import SiteHeader from '@/components/header/SiteHeader';
-import CategorySidebar from '@/components/sidebar/CategorySidebar';
+import HomeHero from '@/components/hero/HomeHero';
+import CuratedPacks from '@/components/packs/CuratedPacks';
 import ControlsToolbar from '@/components/toolbar/ControlsToolbar';
+import CategoryPillBar from '@/components/categories/CategoryPillBar';
 import IconGrid from '@/components/grid/IconGrid';
 import IconDetailDrawer from '@/components/drawer/IconDetailDrawer';
-import AuthModal from '@/components/auth/AuthModal';
 import AddToCollectionModal from '@/components/collections/AddToCollectionModal';
-import { CategoryItem, IconItem } from '@/types/icon';
+import SiteFooter from '@/components/footer/SiteFooter';
+import { CategoryItem, IconItem, IconTier } from '@/types/icon';
 import { getCategories, getIcons } from '@/lib/api';
 import { useIconCustomization } from '@/context/IconCustomizationContext';
 
@@ -17,6 +19,7 @@ export default function HomePage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [totalIcons, setTotalIcons] = useState<number>(5148);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [tier, setTier] = useState<IconTier>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const [icons, setIcons] = useState<IconItem[]>([]);
@@ -28,17 +31,16 @@ export default function HomePage() {
 
   const [selectedIcon, setSelectedIcon] = useState<IconItem | null>(null);
   const [collectionModalIcon, setCollectionModalIcon] = useState<IconItem | null>(null);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
-  // Load categories on initial mount
+  // Load categories and live counts when style changes
   useEffect(() => {
-    getCategories().then((res) => {
+    getCategories(style).then((res) => {
       if (res.success && res.data) {
         setCategories(res.data.categories);
         setTotalIcons(res.data.total_icons);
       }
     });
-  }, []);
+  }, [style]);
 
   // Fetch icons
   const loadIcons = useCallback(
@@ -53,6 +55,7 @@ export default function HomePage() {
         const res = await getIcons({
           category: selectedCategory === 'all' ? undefined : selectedCategory,
           style,
+          tier,
           search: searchQuery.trim() || undefined,
           page: targetPage,
           limit: 48,
@@ -73,89 +76,90 @@ export default function HomePage() {
         setLoadingMore(false);
       }
     },
-    [selectedCategory, style, searchQuery]
+    [selectedCategory, style, tier, searchQuery]
   );
 
   // Trigger fetch when category, style, or search changes
   useEffect(() => {
     const timer = setTimeout(() => {
       loadIcons(false, 1);
-    }, 150); // slight debounce for search input
+    }, 150);
 
     return () => clearTimeout(timer);
   }, [loadIcons]);
 
-  // Load more icons (pagination/infinite)
+  // Load more icons (pagination)
   const handleLoadMore = () => {
     if (page < totalPages && !loadingMore) {
       loadIcons(true, page + 1);
     }
   };
 
+  const handleTagClick = (tag: string) => {
+    setSearchQuery(tag);
+    // Smooth scroll to catalog section
+    const catalogEl = document.getElementById('catalog-section');
+    if (catalogEl) {
+      catalogEl.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#0d0e15]">
+    <div className="min-h-screen flex flex-col bg-[#08090f] text-slate-100">
       {/* Site Header */}
-      <SiteHeader
-        sidebarOpen={mobileSidebarOpen}
-        onToggleSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+      <SiteHeader />
+
+      {/* Hero Showcase with Live Sandbox */}
+      <HomeHero 
+        onSelectTag={handleTagClick}
+        totalIcons={totalIcons}
       />
 
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:block shrink-0">
-          <CategorySidebar
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onSelectCategory={(slug) => {
-              setSelectedCategory(slug);
-            }}
-            totalIcons={totalIcons}
+      {/* Curated Packs Section */}
+      <CuratedPacks 
+        onSelectPack={(query) => {
+          setSearchQuery(query);
+          const catalogEl = document.getElementById('catalog-section');
+          if (catalogEl) {
+            catalogEl.scrollIntoView({ behavior: 'smooth' });
+          }
+        }}
+      />
+
+      {/* Catalog & Studio Section */}
+      <section id="catalog-section" className="relative flex-1 flex flex-col">
+        
+        {/* Floating Glassmorphic Studio Dock */}
+        <ControlsToolbar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          totalIconsFound={totalFiltered}
+          tier={tier}
+          onTierChange={setTier}
+        />
+
+        {/* Horizontal Category Pill Bar */}
+        <CategoryPillBar
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onSelectCategory={(slug) => {
+            setSelectedCategory(slug);
+          }}
+          totalIcons={totalIcons}
+        />
+
+        {/* Responsive Full-Width Icon Grid */}
+        <main className="flex-1 min-h-[400px]">
+          <IconGrid
+            icons={icons}
+            loading={loading}
+            onSelectIcon={setSelectedIcon}
+            hasMore={page < totalPages}
+            onLoadMore={handleLoadMore}
+            loadingMore={loadingMore}
           />
-        </div>
-
-        {/* Mobile Slide-over Sidebar */}
-        {mobileSidebarOpen && (
-          <div className="fixed inset-0 z-40 lg:hidden flex">
-            <div
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setMobileSidebarOpen(false)}
-            />
-            <div className="relative z-50 w-72 h-full bg-[#12131d] shadow-2xl">
-              <CategorySidebar
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onSelectCategory={(slug) => {
-                  setSelectedCategory(slug);
-                  setMobileSidebarOpen(false);
-                }}
-                totalIcons={totalIcons}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Main Content Area */}
-        <main className="flex-1 flex flex-col min-w-0 h-[calc(100vh-4rem)] overflow-hidden">
-          {/* Top Controls Toolbar (Docked cleanly at top) */}
-          <ControlsToolbar
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            totalIconsFound={totalFiltered}
-          />
-
-          {/* Scrollable Icon Grid Container */}
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <IconGrid
-              icons={icons}
-              loading={loading}
-              onSelectIcon={setSelectedIcon}
-              hasMore={page < totalPages}
-              onLoadMore={handleLoadMore}
-              loadingMore={loadingMore}
-            />
-          </div>
         </main>
-      </div>
+      </section>
 
       {/* Icon Detail Drawer */}
       <IconDetailDrawer
@@ -173,8 +177,8 @@ export default function HomePage() {
         onClose={() => setCollectionModalIcon(null)}
       />
 
-      {/* Custom Auth Modal */}
-      <AuthModal />
+      {/* Global Site Footer */}
+      <SiteFooter />
     </div>
   );
 }

@@ -5,7 +5,6 @@ import SiteHeader from '@/components/header/SiteHeader';
 import IconGrid from '@/components/grid/IconGrid';
 import IconDetailDrawer from '@/components/drawer/IconDetailDrawer';
 import AddToCollectionModal from '@/components/collections/AddToCollectionModal';
-import AuthModal from '@/components/auth/AuthModal';
 import { IconItem } from '@/types/icon';
 import { getFavorites } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -101,8 +100,6 @@ export default function FavoritesPage() {
         icon={collectionModalIcon}
         onClose={() => setCollectionModalIcon(null)}
       />
-
-      <AuthModal />
     </div>
   );
 }

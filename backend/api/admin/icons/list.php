@@ -41,6 +41,13 @@ if (!empty($status) && in_array($status, ['published', 'draft', 'archived'])) {
     $params[':status'] = $status;
 }
 
+$tier = trim($_GET['tier'] ?? '');
+if ($tier === 'free') {
+    $where[] = "i.is_premium = 0";
+} elseif ($tier === 'pro' || $tier === 'premium') {
+    $where[] = "i.is_premium = 1";
+}
+
 $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
 // Sort order
@@ -81,7 +88,7 @@ $totalPages = ceil($total / $limit);
 // Main items query
 $itemsSql = "
     SELECT 
-        i.id, i.name, i.slug, i.category_id, i.tags, i.status, 
+        i.id, i.name, i.slug, i.category_id, i.tags, i.status, i.is_premium,
         i.downloads_count, i.favorites_count, i.created_at, i.updated_at, i.created_by,
         c.name AS category_name, c.slug AS category_slug,
         u.username AS creator_username
@@ -116,6 +123,7 @@ if (!empty($icons)) {
     }
     
     foreach ($icons as &$icon) {
+        $icon['is_premium'] = (bool)($icon['is_premium'] ?? false);
         $icon['variants'] = $variantsMap[$icon['id']] ?? [];
         $icon['tags_array'] = !empty($icon['tags']) ? array_filter(array_map('trim', explode(',', $icon['tags']))) : [];
     }
